@@ -1,0 +1,121 @@
+version: '3'
+
+vars:
+  POETRY_VENV: .venv
+  PACKAGE_NAME: s3_log_handler
+
+tasks:
+  install:
+    desc: Install all dependencies
+    cmds:
+      - poetry install --no-root
+      - poetry run pre-commit install
+
+  update:
+    desc: Update all dependencies
+    cmds:
+      - poetry update
+      - poetry run pre-commit autoupdate
+
+  test:
+    desc: Run tests with pytest
+    cmds:
+      - poetry run pytest tests --cov={{.PACKAGE_NAME}} --cov-report=term-missing
+
+  test-watch:
+    desc: Run tests in watch mode
+    cmds:
+      - poetry run ptw tests -- --testmon
+
+  lint:
+    desc: Run all linters and formatters
+    cmds:
+      - poetry run black src/{{.PACKAGE_NAME}} tests
+      - poetry run isort src/{{.PACKAGE_NAME}} tests
+      - poetry run flake8 src/{{.PACKAGE_NAME}} tests
+      - poetry run mypy src/{{.PACKAGE_NAME}}
+
+  format:
+    desc: Format code with black and isort
+    cmds:
+      - poetry run black src/{{.PACKAGE_NAME}} tests
+      - poetry run isort src/{{.PACKAGE_NAME}} tests
+
+  check:
+    desc: Run all checks (linting, formatting, types)
+    deps: [lint]
+    cmds:
+      - poetry run pre-commit run --all-files
+
+  clean:
+    desc: Clean all build and test artifacts
+    cmds:
+      - rm -rf dist/
+      - rm -rf build/
+      - rm -rf .coverage
+      - rm -rf coverage.xml
+      - rm -rf .pytest_cache
+      - rm -rf .mypy_cache
+      - rm -rf .tox
+      - find . -type d -name __pycache__ -exec rm -rf {} +
+      - find . -type d -name "*.egg-info" -exec rm -rf {} +
+
+  build:
+    desc: Build package distributions
+    deps: [clean]
+    cmds:
+      - poetry build
+
+  publish-test:
+    desc: Publish package to TestPyPI
+    deps: [build]
+    cmds:
+      - poetry config repositories.testpypi https://test.pypi.org/legacy/
+      - poetry publish -r testpypi
+
+  publish:
+    desc: Publish package to PyPI
+    deps: [build]
+    cmds:
+      - poetry publish
+
+  version:
+    desc: Bump version (usage task -- version -- patch/minor/major)
+    cmds:
+      - poetry version {{.CLI_ARGS}}
+      - echo "New version -> $(poetry version -s)"
+
+  setup:
+    desc: Initial project setup
+    cmds:
+      - task: clean
+      - task: install
+      - task: check
+      - task: test
+
+  dev:
+    desc: Install package in development mode
+    cmds:
+      - poetry install
+
+  docs:
+    desc: Generate and serve documentation
+    cmds:
+      - poetry run mkdocs serve
+
+  ci:
+    desc: Run CI pipeline locally
+    cmds:
+      - task: clean
+      - task: install
+      - task: check
+      - task: test
+      - task: build
+
+  # Add any project-specific hooks that should run before commit
+  pre-commit:
+    desc: Run pre-commit hooks
+    cmds:
+      - task: format
+      - task: lint
+      - task: test
