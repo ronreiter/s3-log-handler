@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import signal
+import socket
 import threading
 import weakref
 from datetime import datetime
@@ -205,7 +206,7 @@ class S3LogHandler(logging.Handler):
             self.last_flush = datetime.utcnow()
 
         timestamp = datetime.utcnow().strftime("%Y-%m-%d")
-        filename = f"{datetime.utcnow().isoformat()}-{os.getpid()}.jsonl.gz"
+        filename = f"{datetime.utcnow().isoformat()}-{socket.gethostname()}-{os.getpid()}.jsonl.gz"
         s3_key = f"{self.log_prefix}/date={timestamp}/{filename}"
 
         compressed_data = self._compress_logs(logs_to_flush)
