@@ -8,7 +8,7 @@ import signal
 import socket
 import threading
 import weakref
-from datetime import datetime
+import datetime
 from logging import LogRecord
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -37,7 +37,7 @@ class S3LogHandler(logging.Handler):
         self.client_params = client_params
 
         self.log_buffer: List[Dict[str, Any]] = []
-        self.last_flush = datetime.utcnow()
+        self.last_flush = datetime.datetime.utcnow()
         self.session = aioboto3.Session()
         self._lock = threading.Lock()
         self._async_lock = asyncio.Lock()
@@ -142,7 +142,7 @@ class S3LogHandler(logging.Handler):
                     except _queue.Empty:
                         # No items available, check if we need to flush based on time
                         if (
-                            datetime.utcnow() - self.last_flush
+                            datetime.datetime.utcnow() - self.last_flush
                         ).total_seconds() >= self.flush_interval:
                             self._worker_loop.run_until_complete(self._flush_logs())
                         continue
@@ -177,7 +177,7 @@ class S3LogHandler(logging.Handler):
         Format a LogRecord into a dictionary.
         """
         return {
-            "timestamp": datetime.utcfromtimestamp(record.created).isoformat(),
+            "timestamp": datetime.datetime.utcfromtimestamp(record.created).isoformat(),
             "logger": record.name,
             "level": record.levelname,
             "message": record.getMessage(),
@@ -203,11 +203,14 @@ class S3LogHandler(logging.Handler):
         async with self._async_lock:
             logs_to_flush = self.log_buffer.copy()
             self.log_buffer.clear()
-            self.last_flush = datetime.utcnow()
+            self.last_flush = datetime.datetime.utcnow()
 
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d")
-        filename = f"{datetime.utcnow().isoformat()}-{socket.gethostname()}-{os.getpid()}.jsonl.gz"
-        s3_key = f"{self.log_prefix}/date={timestamp}/{filename}"
+        now = datetime.datetime.utcnow()
+        date = now.strftime("%Y-%m-%d")
+        hour = now.strftime("%H")
+        host = socket.gethostname()
+        filename = f"{now.isoformat()}_{host}_{os.getpid()}.jsonl.gz"
+        s3_key = f"{self.log_prefix}/date={date}/hour={hour}/host={host}/{filename}"
 
         compressed_data = self._compress_logs(logs_to_flush)
 
