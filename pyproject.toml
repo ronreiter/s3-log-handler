@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "s3-log-handler"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Python logging handler that uploads logs to Amazon S3"
 authors = ["Your Name <your.email@example.com>"]
 license = "MIT"
