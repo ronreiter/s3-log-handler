@@ -1,5 +1,6 @@
 import asyncio
 import atexit
+import datetime
 import gzip
 import json
 import logging
@@ -8,7 +9,6 @@ import signal
 import socket
 import threading
 import weakref
-import datetime
 from logging import LogRecord
 from queue import Queue
 from typing import Any, Dict, List, Optional
@@ -39,7 +39,6 @@ class S3LogHandler(logging.Handler):
         self.log_buffer: List[Dict[str, Any]] = []
         self.last_flush = datetime.datetime.utcnow()
         self.session = aioboto3.Session()
-        self._lock = threading.Lock()
         self._async_lock = asyncio.Lock()
         self._queue = Queue()
         self._shutdown = threading.Event()
@@ -169,8 +168,10 @@ class S3LogHandler(logging.Handler):
     async def _process_entries(self, entries: List[Dict[str, Any]]) -> None:
         async with self._async_lock:
             self.log_buffer.extend(entries)
-            if len(self.log_buffer) >= self.batch_size:
-                await self._flush_logs()
+            should_flush = len(self.log_buffer) >= self.batch_size
+
+        if should_flush:
+            await self._flush_logs()
 
     def format_log_entry(self, record: LogRecord) -> Dict[str, Any]:
         """
@@ -197,10 +198,10 @@ class S3LogHandler(logging.Handler):
         }
 
     async def _flush_logs(self) -> None:
-        if not self.log_buffer:
-            return
-
         async with self._async_lock:
+            if not self.log_buffer:
+                return
+
             logs_to_flush = self.log_buffer.copy()
             self.log_buffer.clear()
             self.last_flush = datetime.datetime.utcnow()
